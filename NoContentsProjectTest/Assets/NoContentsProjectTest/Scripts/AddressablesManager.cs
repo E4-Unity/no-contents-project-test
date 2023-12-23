@@ -2,16 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using AddressableAssets.Types;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 
 namespace AddressableAssets
 {
     namespace Types
     {
-        /* Enum 정의 */
-        public enum ModelType
+        /* Enum 정의 (Enum 이름은 반드시 상위 Address 이름과 동일해야 한다) */
+        public enum Models
         {
             // 기본값
             None,
@@ -21,12 +21,31 @@ namespace AddressableAssets
         }
     }
 
-    public abstract class AddressablesManager
+    public abstract class AddressablesManager<TEnum> where TEnum : Enum
     {
         /* 필드 */
-        // Enum 매핑
-        static Dictionary<ModelType, string> ModelMap;
+        // Enum to Address Map
+        static readonly Dictionary<TEnum, string> AddressMap = AddressablesManager.CreateAddressMap<TEnum>();
 
+        /* API */
+        public static AsyncOperationHandle<GameObject> InstantiateAsync(TEnum type, Transform parent = null, bool instantiateInWorldSpace = false, bool trackHandle = true)
+        {
+            var address = GetAddress(type);
+            return Addressables.InstantiateAsync(address, parent, instantiateInWorldSpace, trackHandle);
+        }
+
+        public static AsyncOperationHandle<TObject> LoadAssetAsync<TObject>(TEnum type)
+        {
+            var address = GetAddress(type);
+            return Addressables.LoadAssetAsync<TObject>(address);
+        }
+
+        /* 메서드 */
+        static string GetAddress(TEnum type) => AddressMap.TryGetValue(type, out var address) ? address : string.Empty;
+    }
+
+    public abstract class AddressablesManager
+    {
         // 초기화
         public static bool IsInitialized;
         public static event Action OnInitialized;
@@ -38,25 +57,29 @@ namespace AddressableAssets
             // 이벤트 바인딩
             OnInitialized += () => IsInitialized = true;
 
-            // Enum to Address 매핑
-            RegisterAddressNames(ref ModelMap, "Models/");
-
             // Remote 카탈로그 로드
             LoadRemoteCatalogs();
         }
 
         /* API */
-        // 입력된 Enum 에 대응하는 Address Name 반환
-        public static string GetAddress<TEnum>(TEnum type) where TEnum : Enum
+        // Enum to Address 매핑
+        public static Dictionary<TEnum, string> CreateAddressMap<TEnum>() where TEnum : Enum
         {
-            switch (type)
-            {
-                case ModelType prefabType:
-                    return ModelMap.TryGetValue(prefabType, out var address) ? address : string.Empty;
+            // 모든 Enum 값 가져오기 (None 제외)
+            var types = Enum.GetValues(typeof(TEnum));
+            var prefabTypes = new TEnum[types.Length - 1];
+            Array.Copy(types, 1, prefabTypes, 0, prefabTypes.Length);
 
-                default:
-                    return string.Empty;
+            // Dictionary 초기화
+            var addressMap = new Dictionary<TEnum, string>(prefabTypes.Length);
+
+            // Dictionary 요소 등록
+            foreach (var prefabType in prefabTypes)
+            {
+                addressMap.Add(prefabType, typeof(TEnum).Name + "/" + prefabType);
             }
+
+            return addressMap;
         }
 
         /* 메서드 */
@@ -85,29 +108,12 @@ namespace AddressableAssets
                 loadRemoteCatalogTasks[i] = Addressables.LoadContentCatalogAsync(remoteCatalogPaths[i]).Task;
             }
 
+            // TODO Task.WaitAll 을 쓰고 싶은데 무한 루프에 빠져버린다.
             // 모든 Task 가 처리될 때까지 대기
             await Task.WhenAll(loadRemoteCatalogTasks);
 
             // 초기화 완료
             OnInitialized?.Invoke();
-        }
-
-        // Enum to Address 매핑
-        static void RegisterAddressNames<TEnum>(ref Dictionary<TEnum, string> map, string path) where TEnum : Enum
-        {
-            // 모든 Enum 값 가져오기 (None 제외)
-            var types = Enum.GetValues(typeof(TEnum));
-            var prefabTypes = new TEnum[types.Length - 1];
-            Array.Copy(types, 1, prefabTypes, 0, prefabTypes.Length);
-
-            // Dictionary 초기화
-            map = new Dictionary<TEnum, string>(prefabTypes.Length);
-
-            // Dictionary 요소 등록
-            foreach (var prefabType in prefabTypes)
-            {
-                map.Add(prefabType, path + prefabType);
-            }
         }
     }
 }

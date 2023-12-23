@@ -2,16 +2,16 @@ using AddressableAssets;
 using AddressableAssets.Types;
 
 using UnityEngine;
-using UnityEngine.AddressableAssets;
 
 public class Test : MonoBehaviour
 {
     /* 필드 */
-    [SerializeField] ModelType modelType;
+    [SerializeField] Models m_Model;
 
     /* MonoBehaviour */
     void Start()
     {
+        // TODO 좀 더 좋은 방법이 없을까?
         // AddressablesManager 가 초기화된 이후 초기화 진행
         if (AddressablesManager.IsInitialized)
         {
@@ -32,13 +32,12 @@ public class Test : MonoBehaviour
 
     void Spawn()
     {
-        if (modelType == ModelType.None)
+        if (m_Model == Models.None)
         {
             Debug.LogError("Model Type 을 선택해야 합니다.");
             return;
         }
 
-        var address = AddressablesManager.GetAddress(modelType);
-        Addressables.InstantiateAsync(address);
+        AddressablesManager<Models>.InstantiateAsync(m_Model);
     }
 }
