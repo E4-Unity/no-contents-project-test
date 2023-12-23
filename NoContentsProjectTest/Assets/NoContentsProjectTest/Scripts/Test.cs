@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using AddressableAssets;
 using AddressableAssets.Types;
 
@@ -7,19 +6,27 @@ using UnityEngine.AddressableAssets;
 
 public class Test : MonoBehaviour
 {
+    /* 필드 */
     [SerializeField] ModelType modelType;
 
+    /* MonoBehaviour */
     void Start()
     {
-        AsyncStart();
+        // AddressablesManager 가 초기화된 이후 초기화 진행
+        if (AddressablesManager.IsInitialized)
+        {
+            Init();
+        }
+        else
+        {
+            AddressablesManager.OnInitialized += Init;
+        }
     }
 
-    async void AsyncStart()
+    /* 메서드 */
+    void Init()
     {
-        // 로딩 대기
-        await Task.WhenAll(AddressablesManager.Tasks);
-
-        // 스폰
+        // 어드레서블 에셋 스폰
         Spawn();
     }
 
